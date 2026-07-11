@@ -1,21 +1,6 @@
-import axiosInstance from "./authService";
+import API from "./authService";
 
-export const getNotifications = async () => {
-  const { data } = await axiosInstance.get("/notifications");
-  return data;
-};
-
-export const markNotificationAsRead = async (id) => {
-  const { data } = await axiosInstance.put(`/notifications/${id}/read`);
-  return data;
-};
-
-export const markAllNotificationsAsRead = async () => {
-  const { data } = await axiosInstance.put("/notifications/read-all");
-  return data;
-};
-
-export const deleteNotification = async (id) => {
-  const { data } = await axiosInstance.delete(`/notifications/${id}`);
-  return data;
-};
+export const getNotifications = () => API.get("/notifications");
+export const markNotificationAsRead = (id) => API.put(`/notifications/${id}/read`);
+export const markAllNotificationsAsRead = () => API.put("/notifications/read-all");
+export const deleteNotification = (id) => API.delete(`/notifications/${id}`);

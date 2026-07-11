@@ -8,6 +8,7 @@ import ForgotPassword from "../pages/auth/ForgotPassword";
 import ResetPassword from "../pages/auth/ResetPassword";
 import Profile from "../pages/profile/Profile";
 import Dashboard from "../pages/dashboard/Dashboard";
+import Room from "../pages/room/Room";
 
 const AppRoutes = () => {
   return (
@@ -26,6 +27,9 @@ const AppRoutes = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
+
+        {/* Room page — no dashboard chrome, full-screen editor */}
+        <Route path="/room/:roomId" element={<Room />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

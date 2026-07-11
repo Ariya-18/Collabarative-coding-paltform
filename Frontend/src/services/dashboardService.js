@@ -1,6 +1,3 @@
-import axiosInstance from "./authService";
+import API from "./authService";
 
-export const getDashboardStats = async () => {
-  const { data } = await axiosInstance.get("/dashboard/stats");
-  return data;
-};
+export const getDashboardStats = () => API.get("/dashboard/stats");

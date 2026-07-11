@@ -62,6 +62,23 @@ const roomSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    code: {
+  type: String,
+  default: "",
+},
+output: {
+  type: mongoose.Schema.Types.Mixed,
+  default: null,
+},
+code: {
+      type: String,
+      default: "",
+    },
+    output: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    
   },
   { timestamps: true }
 );

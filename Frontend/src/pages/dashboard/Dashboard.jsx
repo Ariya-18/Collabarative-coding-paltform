@@ -26,9 +26,9 @@ const Dashboard = () => {
         getMySessions(),
         getUpcomingInterviews(),
       ]);
-      setStats(statsRes.data);
-      setSessions(sessionsRes.data);
-      setInterviews(interviewsRes.data);
+     setStats(statsRes.data.data);
+setSessions(sessionsRes.data.data);
+setInterviews(interviewsRes.data.data);
     } catch (err) {
       toast.error("Failed to load dashboard data");
     } finally {
