@@ -16,15 +16,14 @@ const Signup = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (data) => {
-    try {
-      const res = await signupApi(data);
-      login(res.data);
-      toast.success("Account created successfully!");
-      navigate("/dashboard");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Signup failed");
-    }
-  };
+  try {
+    const res = await signupApi(data);
+    toast.success(res.data.message || "Account created — verify your email");
+    navigate("/verify-email", { state: { email: data.email } });
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Signup failed");
+  }
+};
 
   return (
     <AuthLayout title="Create Account" subtitle="Start collaborating in real time">

@@ -1,143 +1,115 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import socket from "../../services/socket";
 import { getRoomById } from "../../services/roomService";
-import { connectSocket, disconnectSocket } from "../../services/socket";
+import { useAuth } from "../../context/AuthContext";
 import RoomHeader from "../../components/room/RoomHeader";
-import ParticipantsList from "../../components/room/ParticipantsList";
 import CodeEditor from "../../components/room/CodeEditor";
 import OutputPanel from "../../components/room/OutputPanel";
-import Loader from "../../components/common/Loader";
 
 const Room = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [room, setRoom] = useState(null);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState("// Start coding...");
   const [language, setLanguage] = useState("javascript");
-  const [participants, setParticipants] = useState([]);
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState(null);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const isRemoteChange = useRef(false);
 
-  const socketRef = useRef(null);
-  const emitTimer = useRef(null);
-
+  // Load room details + join socket room
   useEffect(() => {
-    let isMounted = true;
-
-    const setup = async () => {
-      try {
-        const res = await getRoomById(roomId);
-        if (!isMounted) return;
+    getRoomById(roomId)
+      .then((res) => {
         setRoom(res.data);
-        setLanguage(res.data.language);
-        setCode(res.data.code || "");
-      } catch (err) {
-        toast.error(err.response?.data?.message || "Room not found");
-        navigate("/dashboard");
-        return;
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-
-      const socket = connectSocket();
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join-room", { roomId });
-      });
-
-      socket.on("room-state", (state) => {
-        setCode(state.code);
-        setLanguage(state.language);
-        setParticipants(state.participants);
-      });
-
-      socket.on("user-joined", ({ name, participants }) => {
-        setParticipants(participants);
-        toast(`${name} joined the room`, { icon: "👋" });
-      });
-
-      socket.on("user-left", ({ name, participants }) => {
-        setParticipants(participants);
-        toast(`${name} left the room`, { icon: "🚪" });
-      });
-
-      socket.on("code-update", ({ code }) => setCode(code));
-      socket.on("language-update", ({ language }) => setLanguage(language));
-
-      socket.on("run-started", () => setRunning(true));
-
-      socket.on("run-result", (data) => {
-        setRunning(false);
-        setResult(data);
-      });
-
-      socket.on("room-error", ({ message }) => {
-        toast.error(message);
+        setLanguage(res.data.language || "javascript");
+        setCode(res.data.code || "// Start coding...");
+      })
+      .catch(() => {
+        toast.error("Room not found");
         navigate("/dashboard");
       });
-    };
 
-    setup();
+    socket.emit("join-room", { roomId, user: { id: user._id, name: user.name } });
+
+    socket.on("code-change", ({ code: incoming }) => {
+      isRemoteChange.current = true;
+      setCode(incoming);
+    });
+
+    socket.on("execution-started", () => setRunning(true));
+
+    socket.on("code-result", (result) => {
+      setRunning(false);
+      setOutput(result);
+    });
+
+    socket.on("user-joined", ({ user: joinedUser }) => {
+      toast(`${joinedUser.name} joined the room`, { icon: "👋" });
+    });
+
+    socket.on("user-left", ({ user: leftUser }) => {
+      toast(`${leftUser.name} left the room`, { icon: "👋" });
+    });
 
     return () => {
-      isMounted = false;
-      if (socketRef.current) {
-        socketRef.current.emit("leave-room", { roomId });
-        disconnectSocket();
-      }
-      clearTimeout(emitTimer.current);
+      socket.emit("leave-room", { roomId, user: { id: user._id, name: user.name } });
+      socket.off("code-change");
+      socket.off("execution-started");
+      socket.off("code-result");
+      socket.off("user-joined");
+      socket.off("user-left");
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   const handleCodeChange = (value) => {
     setCode(value);
-    clearTimeout(emitTimer.current);
-    emitTimer.current = setTimeout(() => {
-      socketRef.current?.emit("code-change", { roomId, code: value });
-    }, 200);
-  };
-
-  const handleLanguageChange = (value) => {
-    setLanguage(value);
-    socketRef.current?.emit("language-change", { roomId, language: value });
+    if (isRemoteChange.current) {
+      isRemoteChange.current = false;
+      return;
+    }
+    socket.emit("code-change", { roomId, code: value });
   };
 
   const handleRun = () => {
     if (running) return;
-    setResult(null);
-    socketRef.current?.emit("run-code", { roomId, code, language });
+    setOutput(null);
+    socket.emit("run-code", { roomId, code, language, input });
   };
 
-  const handleLeave = () => navigate("/dashboard");
+  const handleLeave = () => {
+    navigate("/dashboard");
+  };
 
-  if (loading) return <Loader fullScreen />;
-  if (!room) return null;
+  if (!room) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen bg-[#0B0F19]">
-      <div className="flex flex-col flex-1 min-w-0">
-        <RoomHeader
-          room={room}
-          language={language}
-          onLanguageChange={handleLanguageChange}
-          onRun={handleRun}
-          running={running}
-          onLeave={handleLeave}
-        />
-        <div className="flex-1 min-h-0">
+    <div className="flex h-screen flex-col bg-background">
+      <RoomHeader
+        room={room}
+        language={language}
+        onLanguageChange={setLanguage}
+        onRun={handleRun}
+        running={running}
+        onLeave={handleLeave}
+      />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1">
           <CodeEditor code={code} language={language} onChange={handleCodeChange} />
         </div>
-        <div className="h-56">
-          <OutputPanel running={running} result={result} />
+        <div className="w-[380px] border-l border-white/10">
+          <OutputPanel output={output} running={running} input={input} onInputChange={setInput} />
         </div>
-      </div>
-      <div className="w-64 border-l border-white/10 bg-[#111827] overflow-y-auto">
-        <ParticipantsList participants={participants} />
       </div>
     </div>
   );

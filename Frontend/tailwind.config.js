@@ -17,8 +17,21 @@ export default {
       fontFamily: {
         sans: ["Inter", "sans-serif"],
       },
-      borderRadius: {
-        xl2: "1.25rem",
+      keyframes: {
+        "wave-move": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "0.4", transform: "scale(1)" },
+          "50%": { opacity: "0.7", transform: "scale(1.15)" },
+        },
+      },
+      animation: {
+        "wave-slow": "wave-move 22s linear infinite",
+        "wave-medium": "wave-move 14s linear infinite reverse",
+        "wave-fast": "wave-move 9s linear infinite",
+        "pulse-glow": "pulse-glow 3.5s ease-in-out infinite",
       },
     },
   },

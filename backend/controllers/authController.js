@@ -3,8 +3,10 @@ const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const { generateOTP, hashOTP } = require("../utils/generateOTP");
+const sendEmail = require("../utils/sendEmail");
 
-// @desc  Register new user
+// @desc  Register new user — sends OTP, does NOT log in yet
 // @route POST /api/auth/signup
 exports.signup = async (req, res) => {
   const errors = validationResult(req);
@@ -22,21 +24,102 @@ exports.signup = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    const { otp, hashedOTP } = generateOTP();
 
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
+      emailVerificationOTP: hashedOTP,
+      emailVerificationExpire: Date.now() + 10 * 60 * 1000, // 10 mins
     });
+
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your CodeShare account",
+      text: `Your verification code is ${otp}. It expires in 10 minutes.`,
+    });
+
+    res.status(201).json({
+      message: "Account created. Check your email for the verification code.",
+      email: user.email,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Verify email with OTP — logs user in on success
+// @route POST /api/auth/verify-email
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email }).select(
+      "+emailVerificationOTP +emailVerificationExpire"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+    if (!user.emailVerificationOTP || user.emailVerificationExpire < Date.now()) {
+      return res.status(400).json({ message: "OTP expired. Please request a new one." });
+    }
+    if (hashOTP(otp) !== user.emailVerificationOTP) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationOTP = undefined;
+    user.emailVerificationExpire = undefined;
+    await user.save();
 
     const token = generateToken(user._id);
 
-    res.status(201).json({
+    res.status(200).json({
       _id: user._id,
       name: user.name,
       email: user.email,
+      isEmailVerified: true,
       token,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Resend OTP
+// @route POST /api/auth/resend-otp
+exports.resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const { otp, hashedOTP } = generateOTP();
+    user.emailVerificationOTP = hashedOTP;
+    user.emailVerificationExpire = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    await sendEmail({
+      to: user.email,
+      subject: "Your new CodeShare verification code",
+      text: `Your new verification code is ${otp}. It expires in 10 minutes.`,
+    });
+
+    res.status(200).json({ message: "A new OTP has been sent to your email" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -63,6 +146,14 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        message: "Please verify your email before logging in",
+        email: user.email,
+        requiresVerification: true,
+      });
+    }
+
     const token = generateToken(user._id);
 
     res.status(200).json({
@@ -77,7 +168,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// @desc  Logout user (client just discards token; endpoint kept for consistency)
+// @desc  Logout user
 // @route POST /api/auth/logout
 exports.logout = async (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
@@ -104,7 +195,6 @@ exports.forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // In production, email this link to the user via sendEmail.js
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
     res.status(200).json({
@@ -187,6 +277,28 @@ exports.updateProfilePicture = async (req, res) => {
     await user.save();
 
     res.status(200).json({ profilePicture: user.profilePicture });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Change password (used from Settings page)
+// @route PUT /api/auth/change-password
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id).select("+password");
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

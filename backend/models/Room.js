@@ -41,36 +41,16 @@ const roomSchema = new mongoose.Schema(
       enum: ["scheduled", "active", "ended"],
       default: "active",
     },
-    scheduledAt: {
-      type: Date,
-      default: null,
-    },
-    startedAt: {
-      type: Date,
-      default: null,
-    },
-    endedAt: {
-      type: Date,
-      default: null,
-    },
-    isPrivate: {
-      type: Boolean,
-      default: false,
-    },
+    scheduledAt: { type: Date, default: null },
+    startedAt: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
+    isPrivate: { type: Boolean, default: false },
     password: {
       type: String,
       default: null,
       select: false,
     },
     code: {
-  type: String,
-  default: "",
-},
-output: {
-  type: mongoose.Schema.Types.Mixed,
-  default: null,
-},
-code: {
       type: String,
       default: "",
     },
@@ -78,16 +58,16 @@ code: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
-    
   },
   { timestamps: true }
 );
 
-roomSchema.pre("save", async function (next) {
-  if (!this.isModified("password") || !this.password) return next();
+// Modern async/await style — no `next` callback parameter at all.
+// Mongoose detects the returned Promise and waits for it automatically.
+roomSchema.pre("save", async function () {
+  if (!this.isModified("password") || !this.password) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 roomSchema.methods.matchPassword = async function (enteredPassword) {

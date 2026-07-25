@@ -22,7 +22,16 @@ const Login = () => {
       toast.success("Welcome back!");
       navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Login failed");
+      const resData = error.response?.data;
+
+      // Unverified accounts get routed to the OTP screen instead of an error dead-end
+      if (resData?.requiresVerification) {
+        toast.error("Please verify your email first");
+        navigate("/verify-email", { state: { email: resData.email } });
+        return;
+      }
+
+      toast.error(resData?.message || "Login failed");
     }
   };
 

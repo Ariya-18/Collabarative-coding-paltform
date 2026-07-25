@@ -1,26 +1,26 @@
-import { Copy, LogOut, Play, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Copy, LogOut, Play, Loader2, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
-
-const LANGUAGES = [
-  { value: "javascript", label: "JavaScript" },
-  { value: "python", label: "Python" },
-  { value: "cpp", label: "C++" },
-  { value: "java", label: "Java" },
-];
+import LanguagePickerModal from "./LanguagePickerModal";
+import { getLanguageByValue } from "../../data/languages";
 
 const RoomHeader = ({ room, language, onLanguageChange, onRun, running, onLeave }) => {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const current = getLanguageByValue(language);
+  const CurrentIcon = current?.icon;
+
   const copyRoomId = () => {
     navigator.clipboard.writeText(room.roomId);
     toast.success("Room ID copied");
   };
 
   return (
-    <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-[#111827]">
+    <div className="flex items-center justify-between border-b border-white/10 bg-[#111827] px-5 py-3">
       <div className="flex items-center gap-3">
-        <h1 className="text-white font-semibold text-sm">{room.title}</h1>
+        <h1 className="text-sm font-semibold text-white">{room.title}</h1>
         <button
           onClick={copyRoomId}
-          className="flex items-center gap-1.5 bg-[#0B0F19] border border-white/10 rounded-md px-2.5 py-1 text-xs text-[#9CA3AF] hover:text-white transition-colors"
+          className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0B0F19] px-2.5 py-1 text-xs text-[#9CA3AF] transition-colors hover:text-white"
         >
           {room.roomId}
           <Copy size={12} />
@@ -28,22 +28,20 @@ const RoomHeader = ({ room, language, onLanguageChange, onRun, running, onLeave 
       </div>
 
       <div className="flex items-center gap-3">
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange(e.target.value)}
-          className="bg-[#0B0F19] border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex items-center gap-2 rounded-md border border-white/10 bg-[#0B0F19] px-3 py-1.5 text-xs text-white transition-colors hover:border-white/20"
         >
-          {LANGUAGES.map((l) => (
-            <option key={l.value} value={l.value}>
-              {l.label}
-            </option>
-          ))}
-        </select>
+          {CurrentIcon && <CurrentIcon size={14} />}
+          {current?.label || language}
+          <ChevronDown size={12} className="text-[#9CA3AF]" />
+        </button>
 
         <button
           onClick={onRun}
           disabled={running}
-          className="flex items-center gap-1.5 bg-[#22C55E] hover:bg-[#22C55E]/90 disabled:opacity-60 text-white text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+          className="flex items-center gap-1.5 rounded-md bg-[#22C55E] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#22C55E]/90 disabled:opacity-60"
         >
           {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
           Run
@@ -51,12 +49,19 @@ const RoomHeader = ({ room, language, onLanguageChange, onRun, running, onLeave 
 
         <button
           onClick={onLeave}
-          className="flex items-center gap-1.5 text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors"
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[#EF4444] transition-colors hover:bg-[#EF4444]/10"
         >
           <LogOut size={14} />
           Leave
         </button>
       </div>
+
+      <LanguagePickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selected={language}
+        onSelect={onLanguageChange}
+      />
     </div>
   );
 };
