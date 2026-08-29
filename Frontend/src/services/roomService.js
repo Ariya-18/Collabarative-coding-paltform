@@ -6,3 +6,5 @@ export const getMySessions = () => API.get("/rooms/my-sessions");
 export const getUpcomingInterviews = () => API.get("/rooms/upcoming");
 export const getRoomById = (roomId) => API.get(`/rooms/${roomId}`);
 export const inviteToRoom = (roomId, email) => API.post(`/rooms/${roomId}/invite`, { email });
+export const getRoomExecutions = (roomId) => API.get(`/rooms/${roomId}/executions`);
+export const getRoomMessages = (roomId) => API.get(`/rooms/${roomId}/messages`);

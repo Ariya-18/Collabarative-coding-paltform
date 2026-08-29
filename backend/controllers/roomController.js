@@ -1,4 +1,6 @@
 const Room = require("../models/Room");
+const Execution = require("../models/Execution");
+const Message = require("../models/Message");
 const generateRoomId = require("../utils/generateRoomId");
 const sendEmail = require("../utils/sendEmail");
 
@@ -152,6 +154,34 @@ exports.inviteToRoom = async (req, res) => {
     });
 
     res.status(200).json({ message: "Invite sent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Get code execution history for a room
+// @route GET /api/rooms/:roomId/executions
+exports.getRoomExecutions = async (req, res) => {
+  try {
+    const executions = await Execution.find({ roomId: req.params.roomId.toUpperCase() })
+      .sort({ timestamp: -1 })
+      .populate("user", "name email profilePicture");
+    
+    res.status(200).json(executions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Get chat message history for a room
+// @route GET /api/rooms/:roomId/messages
+exports.getRoomMessages = async (req, res) => {
+  try {
+    const messages = await Message.find({ roomId: req.params.roomId.toUpperCase() })
+      .sort({ timestamp: 1 })
+      .populate("user", "name email profilePicture");
+    
+    res.status(200).json(messages);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { Copy, LogOut, Play, Loader2, ChevronDown } from "lucide-react";
+import { Copy, LogOut, Play, Loader2, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import LanguagePickerModal from "./LanguagePickerModal";
 import { getLanguageByValue } from "../../data/languages";
 
-const RoomHeader = ({ room, language, onLanguageChange, onRun, running, onLeave }) => {
+const RoomHeader = ({
+  room,
+  language,
+  onLanguageChange,
+  onRun,
+  running,
+  onLeave,
+  isFullscreen,
+  onToggleFullscreen,
+}) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const current = getLanguageByValue(language);
   const CurrentIcon = current?.icon;
@@ -36,6 +45,14 @@ const RoomHeader = ({ room, language, onLanguageChange, onRun, running, onLeave 
           {CurrentIcon && <CurrentIcon size={14} />}
           {current?.label || language}
           <ChevronDown size={12} className="text-[#9CA3AF]" />
+        </button>
+
+        <button
+          onClick={onToggleFullscreen}
+          title={isFullscreen ? "Show Console" : "Focus Mode (Maximize Editor)"}
+          className="flex items-center justify-center rounded-md border border-white/10 bg-[#0B0F19] p-2 text-[#9CA3AF] transition-colors hover:border-white/20 hover:text-white"
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
 
         <button

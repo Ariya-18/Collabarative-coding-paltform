@@ -9,6 +9,8 @@ const {
   getUpcomingInterviews,
   getRoomById,
   inviteToRoom,
+  getRoomExecutions,
+  getRoomMessages,
 } = require("../controllers/roomController");
 const { createRoomValidator, joinRoomValidator } = require("../validators/roomValidator");
 
@@ -18,5 +20,7 @@ router.get("/my-sessions", protect, getMySessions);
 router.get("/upcoming", protect, getUpcomingInterviews);
 router.get("/:roomId", protect, getRoomById);
 router.post("/:roomId/invite", protect, requireVerified, inviteToRoom);
+router.get("/:roomId/executions", protect, getRoomExecutions);
+router.get("/:roomId/messages", protect, getRoomMessages);
 
 module.exports = router;
