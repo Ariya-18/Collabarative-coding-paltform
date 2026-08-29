@@ -11,8 +11,16 @@ import {
   ChevronUp,
   MessageSquare,
   Send,
+  Users,
+  Copy,
+  Smile,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import ParticipantsList from "./ParticipantsList";
+
+// Common emoji set for quick access
+const QUICK_EMOJIS = ["😀", "👍", "❤️", "🎉", "🚀", "💯", "🔥", "👏", "😂", "✨"];
+
 
 const OutputPanel = ({
   output,
@@ -31,9 +39,11 @@ const OutputPanel = ({
   onChatStopTyping,
   unreadCount = 0,
   currentUser,
+  activeParticipants = [],
 }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [messageText, setMessageText] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const chatEndRef = useRef(null);
   const chatTypingTimeoutRef = useRef(null);
   const chatIsCurrentlyTypingRef = useRef(false);
@@ -42,6 +52,25 @@ const OutputPanel = ({
     try {
       const date = new Date(isoString);
       return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
+
+  // Format time relative to now (e.g., "2 mins ago", "1 hour ago")
+  const formatRelativeTime = (isoString) => {
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffSeconds = Math.floor((now - date) / 1000);
+
+      if (diffSeconds < 60) return "just now";
+      const diffMinutes = Math.floor(diffSeconds / 60);
+      if (diffMinutes < 60) return `${diffMinutes} min${diffMinutes > 1 ? "s" : ""} ago`;
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
     } catch {
       return "";
     }
@@ -86,6 +115,14 @@ const OutputPanel = ({
       chatIsCurrentlyTypingRef.current = false;
       onChatStopTyping();
     }, 1500);
+  };
+
+  const handleKeyDown = (e) => {
+    // Send on Enter (unless Shift is held for new line)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend(e);
+    }
   };
 
   return (
@@ -136,6 +173,20 @@ const OutputPanel = ({
                 {unreadCount}
               </span>
             )}
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("participants")}
+          className={`flex-1 py-2.5 text-center text-xs font-semibold transition-colors ${
+            activeTab === "participants"
+              ? "border-b-2 border-[#6366F1] text-white bg-[#0B0F19]/30"
+              : "text-[#9CA3AF] hover:text-white"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1.5">
+            <Users size={12} />
+            Participants ({activeParticipants.length})
           </div>
         </button>
       </div>
@@ -236,6 +287,8 @@ const OutputPanel = ({
               {executions.map((exec) => {
                 const isExpanded = expandedId === exec._id;
                 const hasAccepted = exec.output?.status === "Accepted";
+                const codePreview = exec.code?.split("\n")[0]?.slice(0, 45) || "No code";
+                const codePreviewDisplay = codePreview.length > 42 ? codePreview.slice(0, 42) + "..." : codePreview;
 
                 return (
                   <div
@@ -245,23 +298,48 @@ const OutputPanel = ({
                     {/* Header */}
                     <div
                       onClick={() => toggleExpand(exec._id)}
-                      className="flex cursor-pointer items-center justify-between p-2.5"
+                      className="flex cursor-pointer items-center justify-between gap-3 p-2.5"
                     >
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                      <div className="flex-1 flex flex-col gap-1">
+                        {/* User & Language */}
+                        <div className="flex items-center gap-2">
                           <User size={10} className="text-[#9CA3AF]" />
-                          {exec.user?.name || "User"}
-                        </div>
-                        <span className="text-[9px] text-[#9CA3AF]">
-                          {formatTime(exec.timestamp || exec.createdAt)} •{" "}
-                          <span className="uppercase text-[#8B5CF6] font-medium">
-                            {exec.language}
+                          <span className="text-xs font-semibold text-white">
+                            {exec.user?.name || "User"}
                           </span>
-                        </span>
+                          <span className="text-[8px] font-medium text-[#8B5CF6] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
+                            {exec.language?.toUpperCase() || "JS"}
+                          </span>
+                        </div>
+
+                        {/* Code Preview & Time */}
+                        <div className="flex items-center gap-2 text-[8px] text-[#9CA3AF]">
+                          <span className="font-mono text-[#6366F1]">{codePreviewDisplay}</span>
+                          <span>•</span>
+                          <span className="whitespace-nowrap">{formatRelativeTime(exec.timestamp || exec.createdAt)}</span>
+                          {exec.output?.time && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-0.5">
+                                <Clock size={8} /> {exec.output.time}s
+                              </span>
+                            </>
+                          )}
+                          {exec.output?.memory && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-0.5">
+                                <Database size={8} /> {exec.output.memory}KB
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Status & Expand Icon */}
                       <div className="flex items-center gap-2">
                         <span
-                          className={`rounded px-1.5 py-0.5 text-[8px] font-semibold ${
+                          className={`rounded px-1.5 py-0.5 text-[8px] font-semibold whitespace-nowrap ${
                             hasAccepted
                               ? "bg-[#22C55E]/10 text-[#22C55E]"
                               : "bg-[#EF4444]/10 text-[#EF4444]"
@@ -269,7 +347,11 @@ const OutputPanel = ({
                         >
                           {exec.output?.status || "Unknown"}
                         </span>
-                        {isExpanded ? <ChevronUp size={12} className="text-[#9CA3AF]" /> : <ChevronDown size={12} className="text-[#9CA3AF]" />}
+                        {isExpanded ? (
+                          <ChevronUp size={12} className="text-[#9CA3AF] flex-shrink-0" />
+                        ) : (
+                          <ChevronDown size={12} className="text-[#9CA3AF] flex-shrink-0" />
+                        )}
                       </div>
                     </div>
 
@@ -312,26 +394,40 @@ const OutputPanel = ({
                           </div>
                         )}
 
-                        <div className="flex items-center gap-3 border-t border-white/5 pt-2 text-[9px] text-[#9CA3AF]">
-                          {exec.output?.time && (
-                            <span>Time: {exec.output.time}s</span>
-                          )}
-                          {exec.output?.memory && (
-                            <span>Memory: {exec.output.memory} KB</span>
-                          )}
+                        {/* Code Section */}
+                        <div className="border-t border-white/5 pt-2">
+                          <div className="text-[9px] font-semibold text-[#9CA3AF] mb-1">code executed</div>
+                          <pre className="rounded bg-[#111827] p-1.5 text-white whitespace-pre-wrap text-[9px] max-h-32 overflow-y-auto font-mono">
+                            {exec.code}
+                          </pre>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onRestoreCode(exec.code);
-                            toast.success("Code restored from history!");
-                          }}
-                          className="flex w-full items-center justify-center gap-1 rounded bg-[#6366F1] py-1 text-xs font-semibold text-white transition-colors hover:bg-[#6366F1]/80"
-                        >
-                          <RotateCcw size={11} />
-                          Restore this code state
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 border-t border-white/5 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(exec.code);
+                              toast.success("Code copied to clipboard!");
+                            }}
+                            className="flex flex-1 items-center justify-center gap-1 rounded bg-[#8B5CF6] py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#8B5CF6]/80"
+                          >
+                            <Copy size={12} />
+                            Copy Code
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onRestoreCode(exec.code);
+                              toast.success("Code restored! Continue coding...", { icon: "✨" });
+                            }}
+                            className="flex flex-1 items-center justify-center gap-1 rounded bg-[#6366F1] py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#6366F1]/80"
+                          >
+                            <RotateCcw size={12} />
+                            Restore & Edit
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -354,35 +450,60 @@ const OutputPanel = ({
                 <p className="text-[10px]">Start the conversation in real-time!</p>
               </div>
             ) : (
-              messages.map((msg) => {
+              messages.map((msg, idx) => {
                 const isMe = msg.user?._id === currentUser?._id || msg.user === currentUser?._id;
+                // Check if we should show user info (different user from previous message)
+                const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                const showUserInfo = !prevMsg || prevMsg.user?._id !== msg.user?._id;
+
                 return (
                   <div
                     key={msg._id}
-                    className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                    className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"}`}
                   >
-                    {/* User Tag */}
-                    {!isMe && (
-                      <span className="mb-0.5 text-[9px] text-[#9CA3AF] font-medium px-1">
-                        {msg.user?.name || "User"}
-                      </span>
+                    {/* Avatar */}
+                    {showUserInfo && !isMe && (
+                      <div className="mt-1 flex-shrink-0">
+                        {msg.user?.profilePicture ? (
+                          <img
+                            src={msg.user.profilePicture}
+                            alt={msg.user?.name}
+                            className="h-7 w-7 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-7 w-7 rounded-full bg-[#6366F1] flex items-center justify-center text-xs text-white font-medium">
+                            {msg.user?.name?.charAt(0).toUpperCase() || "U"}
+                          </div>
+                        )}
+                      </div>
                     )}
+                    {showUserInfo && isMe && <div className="w-7 flex-shrink-0" />}
 
-                    {/* Chat Bubble */}
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs break-words leading-relaxed shadow-sm ${
-                        isMe
-                          ? "bg-[#6366F1] text-white rounded-tr-none"
-                          : "bg-[#0B0F19] text-white border border-white/5 rounded-tl-none"
-                      }`}
-                    >
-                      <p>{msg.text}</p>
+                    {/* Message Content */}
+                    <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                      {/* User Tag (only if different from previous) */}
+                      {showUserInfo && !isMe && (
+                        <span className="mb-1 text-[9px] text-[#9CA3AF] font-semibold px-1">
+                          {msg.user?.name || "User"}
+                        </span>
+                      )}
+
+                      {/* Chat Bubble */}
+                      <div
+                        className={`max-w-[280px] rounded-2xl px-3 py-2 text-xs break-words leading-relaxed shadow-sm transition-all ${
+                          isMe
+                            ? "bg-[#6366F1] text-white rounded-tr-none"
+                            : "bg-[#111827] text-white border border-white/10 rounded-tl-none"
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                      </div>
+
+                      {/* Timestamp */}
+                      <span className="mt-0.5 text-[8px] text-[#9CA3AF]/60 px-1 font-mono">
+                        {formatRelativeTime(msg.timestamp || msg.createdAt)}
+                      </span>
                     </div>
-
-                    {/* Timestamp */}
-                    <span className="mt-0.5 text-[8px] text-[#9CA3AF]/65 px-1 font-mono">
-                      {formatTime(msg.timestamp || msg.createdAt)}
-                    </span>
                   </div>
                 );
               })
@@ -392,31 +513,84 @@ const OutputPanel = ({
 
           {/* Typing Indicator */}
           {Object.keys(chatTypingUsers).length > 0 && (
-            <div className="px-3 py-1 text-[9px] text-cyan-400 animate-pulse font-medium">
-              {Object.values(chatTypingUsers).join(", ")}
-              {Object.keys(chatTypingUsers).length === 1 ? " is typing..." : " are typing..."}
+            <div className="px-3 py-2 text-[9px] text-cyan-400 font-medium flex items-center gap-2">
+              <div className="flex gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+              <span>
+                {Object.values(chatTypingUsers).join(", ")}
+                {Object.keys(chatTypingUsers).length === 1 ? " is typing" : " are typing"}
+              </span>
+            </div>
+          )}
+
+          {/* Emoji Picker */}
+          {showEmojiPicker && (
+            <div className="border-t border-white/10 bg-[#111827] p-2 grid grid-cols-5 gap-1">
+              {QUICK_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    setMessageText((prev) => prev + emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  className="h-7 text-lg hover:bg-[#1F2937] rounded transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
             </div>
           )}
 
           {/* Input Box */}
           <form
             onSubmit={handleSend}
-            className="flex items-center gap-2 border-t border-white/10 bg-[#111827] p-2"
+            className="border-t border-white/10 bg-[#111827] p-2 space-y-2"
           >
-            <input
-              type="text"
-              value={messageText}
-              onChange={handleInputChange}
-              placeholder="Type your message..."
-              className="flex-1 rounded-lg border border-white/10 bg-[#0B0F19] px-3 py-2 text-xs text-white placeholder:text-[#9CA3AF]/50 outline-none focus:border-[#6366F1]"
-            />
-            <button
-              type="submit"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1] text-white hover:bg-[#6366F1]/80 transition-colors"
-            >
-              <Send size={12} />
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={messageText}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                className="flex-1 rounded-lg border border-white/10 bg-[#0B0F19] px-3 py-2 text-xs text-white placeholder:text-[#9CA3AF]/50 outline-none focus:border-[#6366F1] focus:bg-[#111827]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-[#1F2937] transition-colors"
+                title="Add emoji"
+              >
+                <Smile size={16} />
+              </button>
+              <button
+                type="submit"
+                disabled={!messageText.trim()}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1] text-white hover:bg-[#6366F1]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Send message (Enter)"
+              >
+                <Send size={14} />
+              </button>
+            </div>
           </form>
+        </div>
+      )}
+
+      {/* Tab: Participants */}
+      {activeTab === "participants" && (
+        <div className="flex-1 overflow-y-auto">
+          {activeParticipants.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center text-[#9CA3AF] opacity-50">
+              <Users size={24} className="mb-2" />
+              <p className="text-xs">No participants yet.</p>
+            </div>
+          ) : (
+            <ParticipantsList participants={activeParticipants} />
+          )}
         </div>
       )}
     </div>

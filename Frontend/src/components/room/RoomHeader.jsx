@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, LogOut, Play, Loader2, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import LanguagePickerModal from "./LanguagePickerModal";
+import VideoControls from "./VideoControls";
 import { getLanguageByValue } from "../../data/languages";
 
 const RoomHeader = ({
@@ -13,6 +14,9 @@ const RoomHeader = ({
   onLeave,
   isFullscreen,
   onToggleFullscreen,
+  isVideoCalling,
+  onToggleVideoCall,
+  isConnecting,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const current = getLanguageByValue(language);
@@ -54,6 +58,12 @@ const RoomHeader = ({
         >
           {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
+
+        <VideoControls
+          isVideoCallActive={isVideoCalling}
+          onToggleVideoCall={onToggleVideoCall}
+          isConnecting={isConnecting}
+        />
 
         <button
           onClick={onRun}
